@@ -16,5 +16,5 @@ jobs:
       - name: Run script
         env:
         GCP_SERVICE_ACCOUNT_FILE: ${{ secrets.GCP_SERVICE_ACCOUNT_FILE }}
-        run: python your_script_name.py
+        run: python extractor.py
         
