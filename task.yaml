@@ -3,7 +3,7 @@ name: Update Google Sheet
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *" # Runs hourly
+    - cron: "0 * * * *"
 
 jobs:
   build:
@@ -19,9 +19,15 @@ jobs:
           python-version: "3.x"
 
       - name: Install dependencies
-        run: pip install gspread google-auth requests
+        run: pip install gspread requests
+
+      - name: Write OAuth files
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+          GOOGLE_AUTHORIZED_USER_JSON: ${{ secrets.GOOGLE_AUTHORIZED_USER_JSON }}
+        run: |
+          printf '%s' "$GOOGLE_CLIENT_SECRET_JSON" > client_secret.json
+          printf '%s' "$GOOGLE_AUTHORIZED_USER_JSON" > authorized_user.json
 
       - name: Run script
-        env:
-          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
         run: python extractor.py
