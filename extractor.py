@@ -1,39 +1,64 @@
+import os
+import json
 import requests
 import gspread
 
-url = "https://api.waterfallhunt.com/api/state"
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0",
-    "Accept": "*/*" ,
-}
-
-response = requests.get(url=url, headers=headers)
-data = response.json()
+API_URL = "https://api.waterfallhunt.com/api/state"
+SPREADSHEET_NAME = "Circle Movement and Shrinkage Data"
+TARGET_RANGE = "B2:D10000"
 
 
+def fetch_circle_data():
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) "
+            "Gecko/20100101 Firefox/151.0"
+        ),
+        "Accept": "*/*",
+    }
 
-# 1. Setup the connection to Google Sheets
-gc = gspread.oauth(
-    credentials_filename="client_secret.json",
-    authorized_user_filename="authorized_user.json"
-)
+    response = requests.get(API_URL, headers=headers, timeout=30)
+    response.raise_for_status()
 
-# 2. Open the specific sheet
-sheet = gc.open("Circle Movement and Shrinkage Data").sheet1 
+    return response.json()
 
-# --- Assume 'data' is the JSON response from your API ---
-circles = data.get("circles", [])
 
-# 3. Format data for Google Sheets (List of Lists)
-# Each internal list represents one row in the sheet
-rows = []
-for c in circles:
-    rows.append([c.get("lat"), c.get("lon"), c.get("radius_m")])
+def get_google_sheet_client():
+    service_account_json = os.environ.get("GCP_SERVICE_ACCOUNT_JSON")
 
-# 4. Post the data
-# append_rows adds multiple rows at once to the bottom of the sheet
-sheet.batch_clear(["B2:D10000"])
-sheet.update("B2", rows)
+    if not service_account_json:
+        raise RuntimeError("Missing GCP_SERVICE_ACCOUNT_JSON environment variable.")
 
-print("Data successfully posted!")
+    service_account_info = json.loads(service_account_json)
+
+    return gspread.service_account_from_dict(service_account_info)
+
+
+def main():
+    data = fetch_circle_data()
+    circles = data.get("circles", [])
+
+    rows = []
+    for c in circles:
+        rows.append([
+            c.get("lat"),
+            c.get("lon"),
+            c.get("radius_m"),
+        ])
+
+    if not rows:
+        print("No circle data found. Sheet was not updated.")
+        return
+
+    gc = get_google_sheet_client()
+    sheet = gc.open(SPREADSHEET_NAME).sheet1
+
+    sheet.batch_clear([TARGET_RANGE])
+    sheet.update("B2", rows)
+
+    print(f"Successfully posted {len(rows)} rows.")
+
+
+if __name__ == "__main__":
+    main()
